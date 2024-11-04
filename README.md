@@ -65,7 +65,7 @@ print(alpr_results)
 
 Output:
 
-<img alt="ALPR Result" height="350" src="https://raw.githubusercontent.com/ankandrew/fast-alpr/5063bd92fdd30f46b330d051468be267d4442c9b/assets/alpr_result.webp" width="700"/>
+<img alt="ALPR Result" src="https://raw.githubusercontent.com/ankandrew/fast-alpr/5063bd92fdd30f46b330d051468be267d4442c9b/assets/alpr_result.webp"/>
 
 You can also draw the predictions directly on the image:
 
