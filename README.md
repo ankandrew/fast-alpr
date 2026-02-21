@@ -159,6 +159,46 @@ print(alpr_results)
 Comprehensive documentation is available [here](https://ankandrew.github.io/fast-alpr/), including detailed API
 references and additional examples.
 
+
+## 🐳 Docker Compose (Production + CCTV)
+
+Run production backend + dashboard on CPU:
+
+```shell
+docker compose up -d alpr-backend-cpu alpr-frontend-cpu
+```
+
+Open:
+
+- Backend API: `http://localhost:8080/latest`
+- Frontend dashboard: `http://localhost:8501`
+
+Use a real CCTV RTSP stream by setting `CCTV_SOURCE`:
+
+```shell
+CCTV_SOURCE="rtsp://user:password@camera-ip:554/stream1" docker compose up -d alpr-backend-cpu alpr-frontend-cpu
+```
+
+GPU production mode (RTX 3060 and other NVIDIA GPUs):
+
+```shell
+CCTV_SOURCE="rtsp://user:password@camera-ip:554/stream1" docker compose --profile gpu up -d alpr-backend-gpu alpr-frontend-gpu
+```
+
+Runtime artifacts are persisted to `./artifacts`:
+
+- `latest_report.json` (latest ALPR result)
+- `latest_frame.jpg` (latest annotated frame)
+- `events.jsonl` (stream of detection events)
+
+Useful environment variables:
+
+- `FRAME_STRIDE` (default: `5`) — run ALPR every N frames
+- `RECONNECT_WAIT_SECONDS` (default: `2`) — reconnect delay when stream drops
+
+> [!NOTE]
+> GPU mode requires NVIDIA Container Toolkit and Docker Compose support for `gpus: all`.
+
 ## 🤝 Contributing
 
 Contributions to the repo are greatly appreciated. Whether it's bug fixes, feature enhancements, or new models,

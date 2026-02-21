@@ -1,0 +1,74 @@
+services:
+  alpr-backend-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: python:3.11-slim
+        ALPR_EXTRAS: onnx
+    command: uvicorn service.cctv_api:app --host 0.0.0.0 --port 8080
+    environment:
+      CCTV_SOURCE: ${CCTV_SOURCE:-assets/test_image.png}
+      FRAME_STRIDE: ${FRAME_STRIDE:-5}
+      RECONNECT_WAIT_SECONDS: ${RECONNECT_WAIT_SECONDS:-2}
+      ARTIFACT_DIR: /app/artifacts
+    volumes:
+      - ./artifacts:/app/artifacts
+    ports:
+      - "8080:8080"
+
+  alpr-backend-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+        ALPR_EXTRAS: onnx-gpu
+    command: uvicorn service.cctv_api:app --host 0.0.0.0 --port 8080
+    environment:
+      CCTV_SOURCE: ${CCTV_SOURCE:-assets/test_image.png}
+      FRAME_STRIDE: ${FRAME_STRIDE:-5}
+      RECONNECT_WAIT_SECONDS: ${RECONNECT_WAIT_SECONDS:-2}
+      ARTIFACT_DIR: /app/artifacts
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - ./artifacts:/app/artifacts
+    ports:
+      - "8080:8080"
+    gpus: all
+
+  alpr-frontend-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: python:3.11-slim
+        ALPR_EXTRAS: onnx
+    command: streamlit run frontend/app.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      BACKEND_URL: http://alpr-backend-cpu:8080
+    depends_on:
+      - alpr-backend-cpu
+    ports:
+      - "8501:8501"
+
+  alpr-frontend-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+        ALPR_EXTRAS: onnx-gpu
+    command: streamlit run frontend/app.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      BACKEND_URL: http://alpr-backend-gpu:8080
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    depends_on:
+      - alpr-backend-gpu
+    ports:
+      - "8501:8501"
+    gpus: all
