@@ -1,10 +1,10 @@
 
 ## 🐳 Docker Compose (Production + CCTV)
 
-Run production backend + dashboard on CPU:
+Run production backend + dashboard
 
 ```shell
-docker compose up -d alpr-backend-cpu alpr-frontend-cpu
+docker compose up -d alpr-backend alpr-frontend
 ```
 
 Open:
@@ -12,16 +12,10 @@ Open:
 - Backend API: `http://localhost:8080/latest`
 - Frontend dashboard: `http://localhost:8501`
 
-Use a real CCTV RTSP stream by setting `CCTV_SOURCE`:
-
-```shell
-CCTV_SOURCE="rtsp://user:password@camera-ip:554/stream1" docker compose up -d alpr-backend-cpu alpr-frontend-cpu
-```
-
 GPU production mode (RTX 3060 and other NVIDIA GPUs):
 
 ```shell
-CCTV_SOURCE="rtsp://user:password@camera-ip:554/stream1" docker compose --profile gpu up -d alpr-backend-gpu alpr-frontend-gpu
+CCTV_SOURCE="rtsp://user:password@camera-ip:554/stream1" docker compose up -d alpr-backend-gpu alpr-frontend-gpu
 ```
 
 Runtime artifacts are persisted to `./artifacts`:
