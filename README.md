@@ -18,6 +18,8 @@ GPU production mode (RTX 3060 and other NVIDIA GPUs):
 CCTV_SOURCE="rtsp://user:password@camera-ip:554/stream1" docker compose up -d alpr-backend-gpu alpr-frontend-gpu
 ```
 
+> You can also use `CTV_SOURCE` for backward compatibility, but `CCTV_SOURCE` is the canonical variable name.
+
 Runtime artifacts are persisted to `./artifacts`:
 
 - `latest_report.json` (latest ALPR result)

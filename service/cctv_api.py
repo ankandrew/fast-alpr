@@ -21,7 +21,8 @@ class CctvProcessor:
     """Continuously read a CCTV source and keep latest ALPR report in memory + disk."""
 
     def __init__(self) -> None:
-        self.source = os.getenv("CCTV_SOURCE", "assets/test_image.png")
+        # Backward-compatible fallback for legacy typo used in some deployment scripts.
+        self.source = os.getenv("CCTV_SOURCE") or os.getenv("CTV_SOURCE") or "assets/test_image.png"
         self.frame_stride = max(1, int(os.getenv("FRAME_STRIDE", "5")))
         self.reconnect_wait_seconds = float(os.getenv("RECONNECT_WAIT_SECONDS", "2"))
         self.artifact_dir = Path(os.getenv("ARTIFACT_DIR", "artifacts"))
