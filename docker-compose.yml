@@ -32,7 +32,7 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
-      - alpr-backend-gpu
+      - alpr-backend
     ports:
       - "8501:8501"
     gpus: all
