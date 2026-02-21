@@ -12,9 +12,27 @@ from pathlib import Path
 from typing import Any
 
 import cv2
+import onnxruntime as ort
 from fastapi import FastAPI
 
 from fast_alpr import ALPR
+
+
+def _resolve_onnx_providers() -> list[str]:
+    """Resolve ONNX Runtime execution providers from env + availability."""
+
+    configured = os.getenv("ONNX_PROVIDERS")
+    if configured:
+        return [provider.strip() for provider in configured.split(",") if provider.strip()]
+
+    available = set(ort.get_available_providers())
+    preferred = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+    if os.getenv("ENABLE_TENSORRT", "0") == "1":
+        preferred.insert(0, "TensorrtExecutionProvider")
+
+    providers = [provider for provider in preferred if provider in available]
+    return providers or ["CPUExecutionProvider"]
 
 
 class CctvProcessor:
@@ -39,10 +57,13 @@ class CctvProcessor:
             "detections": [],
         }
         self._stop_event = threading.Event()
+        providers = _resolve_onnx_providers()
 
         self.alpr = ALPR(
             detector_model=os.getenv("DETECTOR_MODEL", "yolo-v9-t-384-license-plate-end2end"),
             ocr_model=os.getenv("OCR_MODEL", "cct-xs-v1-global-model"),
+            detector_providers=providers,
+            ocr_providers=providers,
         )
 
     def start(self) -> None:
