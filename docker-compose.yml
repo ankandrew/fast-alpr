@@ -28,7 +28,7 @@ services:
         ALPR_EXTRAS: onnx-gpu
     command: streamlit run frontend/app.py --server.address 0.0.0.0 --server.port 8501
     environment:
-      BACKEND_URL: http://alpr-backend-gpu:8080
+      BACKEND_URL: http://alpr-backend:8080
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
