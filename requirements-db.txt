@@ -1,0 +1,15 @@
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+
+# API
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# Frontend
+streamlit>=1.25.0
+pillow>=10.0.0
+
+# ONNX Runtime
+onnxruntime-gpu>=1.19.2  # NVIDIA GPU

@@ -1,5 +1,5 @@
 """
-Default OCR module.
+Default OCR module with Thai license plate support.
 """
 
 import os
@@ -13,14 +13,14 @@ from fast_plate_ocr import LicensePlateRecognizer
 from fast_plate_ocr.inference.hub import OcrModel
 
 from fast_alpr.base import BaseOCR, OcrResult
+from utils.thai_plate_parser import parse_thai_plate
 
 
 class DefaultOCR(BaseOCR):
     """
     Default OCR class for license plate recognition using ONNX models.
-
-    This class utilizes the `LicensePlateRecognizer` from the `fast-plate-ocr` package
-    to perform OCR on cropped license plate images.
+    
+    Enhanced with Thai license plate parsing capabilities.
     """
 
     def __init__(
@@ -32,25 +32,20 @@ class DefaultOCR(BaseOCR):
         model_path: str | os.PathLike | None = None,
         config_path: str | os.PathLike | None = None,
         force_download: bool = False,
+        parse_thai: bool = True,
     ) -> None:
         """
-        Initialize the DefaultOCR with the specified parameters. Uses `fast-plate-ocr`'s
-        `LicensePlateRecognizer`
+        Initialize the DefaultOCR with the specified parameters.
 
         Parameters:
             hub_ocr_model: The name of the OCR model from the model hub.
-            device: The device to run the model on. Options are "cuda", "cpu", or "auto". Defaults
-             to "auto".
-            providers: The execution providers to use in ONNX Runtime. If None, the default
-             providers are used.
-            sess_options: Custom session options for ONNX Runtime. If None, default session options
-             are used.
-            model_path: Path to a custom OCR model file. If None, the model is downloaded from the
-             hub or cache.
-            config_path: Path to a custom configuration file. If None, the default configuration is
-             used.
-            force_download: If True, forces the download of the model and overwrites any existing
-             files.
+            device: The device to run the model on. Options are "cuda", "cpu", or "auto".
+            providers: The execution providers to use in ONNX Runtime.
+            sess_options: Custom session options for ONNX Runtime.
+            model_path: Path to a custom OCR model file.
+            config_path: Path to a custom configuration file.
+            force_download: If True, forces the download of the model.
+            parse_thai: If True, parse Thai license plate format.
         """
         self.ocr_model = LicensePlateRecognizer(
             hub_ocr_model=hub_ocr_model,
@@ -61,28 +56,47 @@ class DefaultOCR(BaseOCR):
             plate_config_path=config_path,
             force_download=force_download,
         )
+        self.parse_thai = parse_thai
 
     def predict(self, cropped_plate: np.ndarray) -> OcrResult | None:
         """
         Perform OCR on a cropped license plate image.
+        
+        For Thai plates, attempts to parse the format into category, number, and province.
 
         Parameters:
             cropped_plate: The cropped image of the license plate in BGR format.
 
         Returns:
-            OcrResult: An object containing the recognized text and per-character confidence.
+            OcrResult with text and confidence. For Thai plates, text may be formatted.
         """
         if cropped_plate is None:
             return None
+            
         if self.ocr_model.config.image_color_mode == "grayscale":
             cropped_plate = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2GRAY)
+            
         plate_text, probabilities = self.ocr_model.run(cropped_plate, return_confidence=True)
+        
         if not isinstance(plate_text, list):
             raise TypeError(f"Expected plate_text to be a list, got {type(plate_text).__name__}")
         if not isinstance(probabilities, np.ndarray):
             raise TypeError(
                 f"Expected probabilities to be a numpy ndarray, got {type(probabilities).__name__}"
             )
+            
         # fast_plate_ocr uses '_' padding symbol
-        plate_text = plate_text.pop().replace("_", "")
-        return OcrResult(text=plate_text, confidence=float(np.mean(probabilities)))
+        plate_text_str = plate_text.pop().replace("_", "")
+        avg_confidence = float(np.mean(probabilities))
+        
+        # For Thai plates, attempt to parse the format
+        if self.parse_thai:
+            thai_info = parse_thai_plate(plate_text_str)
+            if thai_info:
+                # Store parsed info in a structured way
+                # The text field will contain the formatted version
+                formatted_text = f"{thai_info.category} {thai_info.number} {thai_info.province}".strip()
+                if formatted_text:
+                    plate_text_str = formatted_text
+        
+        return OcrResult(text=plate_text_str, confidence=avg_confidence)

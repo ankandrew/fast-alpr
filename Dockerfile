@@ -13,6 +13,7 @@ RUN apt-get update \
         python3-venv \
         libglib2.0-0 \
         libgl1 \
+        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN ln -sf /usr/bin/python3 /usr/bin/python
@@ -23,6 +24,6 @@ COPY . .
 
 ARG ALPR_EXTRAS=onnx
 RUN python -m pip install --upgrade pip \
-    && python -m pip install ".[${ALPR_EXTRAS}]" fastapi uvicorn streamlit
+    && python -m pip install ".[${ALPR_EXTRAS}]" fastapi uvicorn streamlit sqlalchemy psycopg2-binary
 
-CMD ["uvicorn", "service.cctv_api:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "service.cctv_api:app", "--host", "0.0.0.0", "--port", "8000"]

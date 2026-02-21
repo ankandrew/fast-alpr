@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-thai_alpr}
+      POSTGRES_USER: ${POSTGRES_USER:-alpr_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alpr_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alpr_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   alpr-backend:
     build:
       context: .
@@ -6,19 +22,27 @@ services:
       args:
         BASE_IMAGE: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
         ALPR_EXTRAS: onnx-gpu
-    command: uvicorn service.cctv_api:app --host 0.0.0.0 --port 8080
+    command: uvicorn service.cctv_api:app --host 0.0.0.0 --port 8000
     environment:
       CCTV_SOURCE: ${CCTV_SOURCE:-assets/test_image.png}
       FRAME_STRIDE: ${FRAME_STRIDE:-5}
       RECONNECT_WAIT_SECONDS: ${RECONNECT_WAIT_SECONDS:-2}
       ARTIFACT_DIR: /app/artifacts
+      DATASET_DIR: /app/dataset
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      # Database configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alpr_user}:${POSTGRES_PASSWORD:-alpr_password}@postgres:5432/${POSTGRES_DB:-thai_alpr}
     volumes:
       - ./artifacts:/app/artifacts
+      - ./dataset:/app/dataset
     ports:
-      - "8080:8080"
+      - "8000:8000"
     gpus: all
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   alpr-frontend:
     build:
       context: .
@@ -26,13 +50,16 @@ services:
       args:
         BASE_IMAGE: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
         ALPR_EXTRAS: onnx-gpu
-    command: streamlit run frontend/app.py --server.address 0.0.0.0 --server.port 8501
+    command: streamlit run frontend/app.py --server.address 0.0.0.0 --server.port 3000
     environment:
-      BACKEND_URL: http://alpr-backend:8080
+      BACKEND_URL: http://alpr-backend:8000
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
       - alpr-backend
     ports:
-      - "8501:8501"
+      - "3000:3000"
     gpus: all
+
+volumes:
+  postgres_data:
