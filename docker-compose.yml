@@ -1,5 +1,5 @@
 services:
-  alpr-backend-gpu:
+  alpr-backend:
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,7 +19,7 @@ services:
     ports:
       - "8080:8080"
     gpus: all
-  alpr-frontend-gpu:
+  alpr-frontend:
     build:
       context: .
       dockerfile: Dockerfile
