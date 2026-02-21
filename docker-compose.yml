@@ -1,0 +1,23 @@
+services:
+  alpr-test-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: python:3.11-slim
+        ALPR_EXTRAS: onnx
+    command: pytest test/ -q
+
+  alpr-test-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+        ALPR_EXTRAS: onnx-gpu
+    command: pytest test/ -q
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility

@@ -159,6 +159,24 @@ print(alpr_results)
 Comprehensive documentation is available [here](https://ankandrew.github.io/fast-alpr/), including detailed API
 references and additional examples.
 
+
+## 🐳 Docker Compose (Test)
+
+Run the test suite in Docker (CPU):
+
+```shell
+docker compose run --rm alpr-test-cpu
+```
+
+Run the test suite with NVIDIA GPU (e.g. RTX 3060):
+
+```shell
+docker compose --profile gpu run --rm alpr-test-gpu
+```
+
+> [!NOTE]
+> GPU mode requires NVIDIA Container Toolkit on the host and a recent Docker Compose version that supports `gpus: all`.
+
 ## 🤝 Contributing
 
 Contributions to the repo are greatly appreciated. Whether it's bug fixes, feature enhancements, or new models,
