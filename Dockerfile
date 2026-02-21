@@ -23,6 +23,6 @@ COPY . .
 
 ARG ALPR_EXTRAS=onnx
 RUN python -m pip install --upgrade pip \
-    && python -m pip install ".[${ALPR_EXTRAS}]" pytest
+    && python -m pip install ".[${ALPR_EXTRAS}]" fastapi uvicorn streamlit
 
-CMD ["pytest", "test/", "-q"]
+CMD ["uvicorn", "service.cctv_api:app", "--host", "0.0.0.0", "--port", "8080"]
