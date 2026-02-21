@@ -1,6 +1,5 @@
 services:
   alpr-backend-gpu:
-    profiles: ["gpu"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -21,7 +20,6 @@ services:
       - "8080:8080"
     gpus: all
   alpr-frontend-gpu:
-    profiles: ["gpu"]
     build:
       context: .
       dockerfile: Dockerfile
