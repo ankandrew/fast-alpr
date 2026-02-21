@@ -1,145 +1,63 @@
-"""Production CCTV ALPR API service."""
+"""Production dashboard for CCTV ALPR reports."""
 
 from __future__ import annotations
 
 import json
 import os
-import threading
-import time
-from dataclasses import asdict
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from urllib.error import URLError
+from urllib.request import urlopen
 
-import cv2
-from fastapi import FastAPI
+import streamlit as st
 
-from fast_alpr import ALPR
+st.set_page_config(page_title="FastALPR CCTV Dashboard", layout="wide")
+st.title("📹 FastALPR CCTV Dashboard")
 
+backend_url = os.getenv("BACKEND_URL", "http://alpr-backend-cpu:8080")
+latest_endpoint = f"{backend_url.rstrip('/')}/latest"
 
-class CctvProcessor:
-    """Continuously read a CCTV source and keep latest ALPR report in memory + disk."""
+st.caption(f"Backend: {latest_endpoint}")
+refresh = st.button("Refresh report")
+auto_refresh = st.toggle("Auto refresh (every 5s)", value=True)
+if auto_refresh:
+    st.markdown("<meta http-equiv='refresh' content='5'>", unsafe_allow_html=True)
 
-    def __init__(self) -> None:
-        self.source = os.getenv("CCTV_SOURCE", "assets/test_image.png")
-        self.frame_stride = max(1, int(os.getenv("FRAME_STRIDE", "5")))
-        self.reconnect_wait_seconds = float(os.getenv("RECONNECT_WAIT_SECONDS", "2"))
-        self.artifact_dir = Path(os.getenv("ARTIFACT_DIR", "artifacts"))
-        self.artifact_dir.mkdir(parents=True, exist_ok=True)
-        self.report_path = self.artifact_dir / "latest_report.json"
-        self.snapshot_path = self.artifact_dir / "latest_frame.jpg"
-        self.events_path = self.artifact_dir / "events.jsonl"
+if refresh or auto_refresh:
+    try:
+        with urlopen(latest_endpoint, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except URLError as exc:
+        st.error(f"Cannot connect to backend: {exc}")
+        st.stop()
 
-        self._lock = threading.Lock()
-        self._latest_report: dict[str, Any] = {
-            "status": "initializing",
-            "source": self.source,
-            "updated_at": None,
-            "detections": [],
-        }
-        self._stop_event = threading.Event()
+    left, right = st.columns(2)
+    with left:
+        st.metric("Status", payload.get("status", "unknown"))
+        st.metric("Detected plates", payload.get("plates_detected", 0))
+        st.write(f"Updated at: {payload.get('updated_at', '-')}")
+        st.write(f"Source: {payload.get('source', '-')}")
+    with right:
+        st.subheader("Raw JSON")
+        st.json(payload)
 
-        self.alpr = ALPR(
-            detector_model=os.getenv("DETECTOR_MODEL", "yolo-v9-t-384-license-plate-end2end"),
-            ocr_model=os.getenv("OCR_MODEL", "cct-xs-v1-global-model"),
-        )
-
-    def start(self) -> None:
-        thread = threading.Thread(target=self._run, daemon=True)
-        thread.start()
-
-    def stop(self) -> None:
-        self._stop_event.set()
-
-    def latest(self) -> dict[str, Any]:
-        with self._lock:
-            return dict(self._latest_report)
-
-    def _run(self) -> None:
-        while not self._stop_event.is_set():
-            capture = cv2.VideoCapture(self.source)
-            if not capture.isOpened():
-                self._set_error(f"Cannot open CCTV source: {self.source}")
-                time.sleep(self.reconnect_wait_seconds)
-                continue
-
-            frame_index = 0
-            while not self._stop_event.is_set():
-                ok, frame = capture.read()
-                if not ok or frame is None:
-                    self._set_error("CCTV stream ended/unavailable, reconnecting...")
-                    break
-
-                frame_index += 1
-                if frame_index % self.frame_stride != 0:
-                    continue
-
-                results = self.alpr.predict(frame)
-                annotated = self.alpr.draw_predictions(frame.copy())
-                detections: list[dict[str, Any]] = []
-                for item in results:
-                    row = {
-                        "detection": {
-                            "label": item.detection.label,
-                            "confidence": item.detection.confidence,
-                            "bounding_box": asdict(item.detection.bounding_box),
-                        },
-                        "ocr": asdict(item.ocr) if item.ocr is not None else None,
-                    }
-                    detections.append(row)
-
-                payload = {
-                    "status": "running",
-                    "source": self.source,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "frame_index": frame_index,
-                    "plates_detected": len(results),
-                    "detections": detections,
+    detections = payload.get("detections", [])
+    if detections:
+        rows = []
+        for idx, item in enumerate(detections, start=1):
+            bbox = item["detection"]["bounding_box"]
+            rows.append(
+                {
+                    "id": idx,
+                    "label": item["detection"]["label"],
+                    "detection_confidence": round(item["detection"]["confidence"], 4),
+                    "ocr_text": (item.get("ocr") or {}).get("text", ""),
+                    "ocr_confidence": (item.get("ocr") or {}).get("confidence", ""),
+                    "x1": bbox["x1"],
+                    "y1": bbox["y1"],
+                    "x2": bbox["x2"],
+                    "y2": bbox["y2"],
                 }
-                with self._lock:
-                    self._latest_report = payload
-
-                self.report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-                cv2.imwrite(str(self.snapshot_path), annotated)
-                with self.events_path.open("a", encoding="utf-8") as events_file:
-                    events_file.write(json.dumps(payload, ensure_ascii=False) + "\n")
-
-            capture.release()
-            time.sleep(self.reconnect_wait_seconds)
-
-    def _set_error(self, message: str) -> None:
-        payload = {
-            "status": "error",
-            "source": self.source,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "message": message,
-            "detections": [],
-        }
-        with self._lock:
-            self._latest_report = payload
-        self.report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-processor = CctvProcessor()
-app = FastAPI(title="FastALPR CCTV Service", version="1.0.0")
-
-
-@app.on_event("startup")
-def startup_event() -> None:
-    processor.start()
-
-
-@app.on_event("shutdown")
-def shutdown_event() -> None:
-    processor.stop()
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    latest = processor.latest()
-    return {"status": latest.get("status", "unknown")}
-
-
-@app.get("/latest")
-def latest() -> dict[str, Any]:
-    return processor.latest()
+            )
+        st.subheader("Detection Report")
+        st.dataframe(rows, use_container_width=True)
+    else:
+        st.info("No detections yet.")
